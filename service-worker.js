@@ -214,3 +214,30 @@ self.addEventListener('activate', event => {
     );
 });
 
+// ▼▼ message イベントリスナーを追加 (キャッシュ削除用) ▼▼
+self.addEventListener('message', event => {
+    // action が 'clearCache' のメッセージか確認
+    if (event.data && event.data.action === 'clearCache') {
+        console.log('Received clearCache message. Deleting all tile caches...');
+        
+        // DYNAMIC_CACHE_LIST に含まれるすべてのタイルキャッシュを削除
+        event.waitUntil(
+            Promise.all(
+                // DYNAMIC_CACHE_LIST をイテレートして caches.delete() を実行
+                DYNAMIC_CACHE_LIST.map(cacheName => {
+                    return caches.delete(cacheName).then(deleted => {
+                        console.log(`Cache ${cacheName} deleted: ${deleted}`);
+                        return deleted;
+                    });
+                })
+            ).then(() => {
+                console.log('All tile caches have been deleted.');
+                // オプション: 削除完了をクライアントに通知する場合
+                // self.clients.matchAll().then(clients => {
+                //     clients.forEach(client => client.postMessage({ type: 'CACHE_CLEARED' }));
+                // });
+            })
+        );
+    }
+});
+

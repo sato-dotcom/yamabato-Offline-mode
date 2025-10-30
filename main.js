@@ -46,16 +46,16 @@ function initializeMap() {
         attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>',
         maxZoom: 22, maxNativeZoom: 18
     });
-
-    // ▼▼ 修正点 1: OpenStreetMap (osmLayer) の定義を削除 ▼▼
+    
+    // ▼▼ OpenStreetMap (osmLayer) の定義を削除 ▼▼
     /*
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 22,
     });
     */
-
-    // ▼▼ 修正点 2: 無地背景（白）レイヤーを追加 ▼▼
+    
+    // ▼▼ 無地背景（白）レイヤーを追加 ▼▼
     const BlankLayer = L.GridLayer.extend({
         createTile: function(){
             const tile = document.createElement('div');
@@ -99,7 +99,7 @@ function initializeMap() {
     // 標準コントロールの追加
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    // ▼▼ 修正点 3: 背景地図とオーバーレイ地図の定義を修正 ▼▼
+    // ▼▼ 背景地図とオーバーレイ地図の定義を修正 ▼▼
     const baseMaps = { 
         "標準地図 (等高線)": gsiStdLayer, 
         "航空写真": gsiPhotoLayer, 
@@ -197,6 +197,33 @@ function setupEventListeners() {
     dom.copyReportBtn.addEventListener('click', copyReportToClipboard);
     dom.alertOkBtn.addEventListener('click', () => hideModal(dom.alertModal));
 
+    // ▼▼ キャッシュ削除ボタンのイベントリスナーを追加 ▼▼
+    const clearCacheBtn = document.getElementById('clear-cache-btn');
+    if (clearCacheBtn) {
+        clearCacheBtn.addEventListener('click', () => {
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                // Service Workerにキャッシュ削除を要求
+                navigator.serviceWorker.controller.postMessage({ action: 'clearCache' });
+                
+                // showAlert は ui.js で定義されていると仮定
+                if (typeof showAlert === 'function') {
+                    showAlert("地図タイルキャッシュの削除をリクエストしました。");
+                } else {
+                    // フォールバック
+                    alert("地図タイルキャッシュの削除をリクエストしました。"); 
+                }
+            } else {
+                if (typeof showAlert === 'function') {
+                    showAlert("Service Worker がアクティブではありません。", "エラー");
+                } else {
+                    // フォールバック
+                    alert("Service Worker がアクティブではありません。"); 
+                }
+            }
+        });
+    }
+    // ▲▲ ここまで追加 ▲▲
+
     // ポイントリストのクリックイベント（イベント委任）
     dom.pointList.addEventListener('click', handlePointListClick);
     dom.importedPointList.addEventListener('click', handleImportedListClick);
@@ -218,3 +245,4 @@ function setupEventListeners() {
     dom.importCoordSystemSelect.addEventListener('change', saveData);
     dom.manualXyCoordSystemSelect.addEventListener('change', saveData);
 }
+
