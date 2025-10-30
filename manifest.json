@@ -1,15 +1,22 @@
 {
-  "name": "やまばとオフラインモード",
+  "name": "やまばと (山岳版測量支援アプリ)",
   "short_name": "やまばと",
-  "start_url": "./index.html",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#000000",
+  "description": "山岳地などでの測量作業を支援するウェブアプリです。",
   "icons": [
     {
       "src": "やまばとスタートアイコン.png",
       "sizes": "192x192",
       "type": "image/png"
+    },
+    {
+      "src": "やまばとスタートアイコン.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
+
