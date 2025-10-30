@@ -1,5 +1,5 @@
 const CACHE_NAME = 'yamabato-cache-v1';
-// キャッシュするファイルのリスト。README.mdによると style.css, logic.js, ui.js が存在するため追加します。
+// キャッシュするファイルのリスト（前回定義したもの）
 const urlsToCache = [
   './', // ルートパスもキャッシュ（'/' でも可）
   './index.html',
@@ -9,7 +9,7 @@ const urlsToCache = [
   './ui.js',
   './manifest.json',
   './やまばとスタートアイコン.png',
-  // ライブラリのCDNリンクもキャッシュ対象に追加（オフライン動作の安定化のため）
+  // ライブラリのCDNリンク
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
@@ -17,26 +17,67 @@ const urlsToCache = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
 
-// install イベント: キャッシュをインストールする
+// install イベント: 静的ファイルをキャッシュする
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        // addAllはアトミック操作。一つでも失敗すると全体が失敗する。
-        // CDNリソースのキャッシュに失敗する可能性がある場合、個別にaddリクエストを送信し、失敗を許容する戦略も考えられますが、
-        // まずはaddAllで試みます。
         return cache.addAll(urlsToCache).catch(error => {
           console.error('Failed to cache resources during install:', error);
-          // 必須でないリソースで失敗した場合でも、インストールを続行させる場合は
-          // ここでPromise.resolve()を返すことも可能ですが、一旦失敗させます。
         });
       })
   );
 });
 
-// fetch イベント: リクエストを傍受し、キャッシュから返す
+// fetch イベント: リクエストを傍受し、キャッシュ戦略を適用する
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // main.jsで定義されているタイルレイヤーのホスト名
+  const tileHostnames = [
+    'cyberjapandata.gsi.go.jp',
+    'rinpan-f93d64.netlify.app',
+    'yamabato-tiseki-saijo-4d9a42.netlify.app',
+    'snkozu-72971b.netlify.app'
+  ];
+
+  // ▼▼▼ 修正箇所: タイルキャッシュ処理 ▼▼▼
+  // リクエストURLのホスト名がタイルホストリストに含まれているか確認
+  if (tileHostnames.includes(url.hostname)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(cache => {
+        return cache.match(event.request).then(response => {
+          // 1. キャッシュに存在すれば、それを返す
+          if (response) {
+            return response;
+          }
+          
+          // 2. キャッシュになければ、ネットワークから取得
+          return fetch(event.request).then(networkResponse => {
+            // 3. 取得したレスポンスをキャッシュに保存
+            //    (ネットワークエラー時や不透明なレスポンス(opaque)はキャッシュしないようチェック)
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              cache.put(event.request, networkResponse.clone());
+            } else if (networkResponse && networkResponse.status === 0) {
+              // no-corsモードでのリクエスト（netlifyタイルなど）
+              cache.put(event.request, networkResponse.clone());
+            }
+            // 4. ネットワークレスポンスを返す
+            return networkResponse;
+          }).catch(error => {
+            console.error('Fetching tile failed:', error);
+            throw error;
+          });
+        });
+      })
+    );
+    return; // タイル処理はここで終了
+  }
+  // ▲▲▲ 修正箇所 ここまで ▲▲▲
+
+  // ▼▼▼ 既存の処理: 静的ファイル（App Shell）のキャッシュ戦略 ▼▼▼
+  // キャッシュファースト戦略
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -46,15 +87,13 @@ self.addEventListener('fetch', event => {
         }
         // キャッシュになければネットワークから取得する
         return fetch(event.request).catch(error => {
-          // ネットワークエラー（オフラインなど）
-          console.log('Fetch failed; returning offline page instead.', error);
-          // ここでオフライン用の代替ページを返すことも可能
+          console.log('Fetch failed for non-tile resource:', event.request.url, error);
         });
       })
   );
 });
 
-// activate イベント: 古いキャッシュを削除する（今回はv1なのでシンプルに）
+// activate イベント: 古いキャッシュを削除する
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
@@ -69,3 +108,4 @@ self.addEventListener('activate', event => {
     })
   );
 });
+
